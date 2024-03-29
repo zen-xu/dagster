@@ -17,7 +17,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import ParamSpec
+from typing_extensions import Concatenate, ParamSpec
 
 import dagster._check as check
 from dagster._annotations import deprecated_param
@@ -43,6 +43,8 @@ from ..policy import RetryPolicy
 from ..utils import DEFAULT_OUTPUT
 
 if TYPE_CHECKING:
+    from dagster._core.execution.context.compute import OpExecutionContext
+
     from ..op_definition import OpDefinition
 
 
@@ -82,7 +84,15 @@ class _Op:
         self.ins = check.opt_nullable_mapping_param(ins, "ins", key_type=str, value_type=In)
         self.out = out
 
-    def __call__(self, fn: Callable[P, R]) -> "OpDefinition[P, R]":
+    @overload
+    def __call__(
+        self, fn: "Callable[Concatenate[OpExecutionContext, P], R]"
+    ) -> "OpDefinition[P, R]": ...
+
+    @overload
+    def __call__(self, fn: Callable[P, R]) -> "OpDefinition[P, R]": ...
+
+    def __call__(self, fn) -> Any:
         from dagster._config.pythonic_config import validate_resource_annotated_function
 
         from ..op_definition import OpDefinition
@@ -149,6 +159,10 @@ class _Op:
 
 
 @overload
+def op(compute_fn: "Callable[Concatenate[OpExecutionContext, P], R]") -> "OpDefinition[P, R]": ...
+
+
+@overload
 def op(compute_fn: Callable[P, R]) -> "OpDefinition[P, R]": ...
 
 
@@ -172,7 +186,7 @@ def op(
     param="version", breaking_version="2.0", additional_warn_text="Use `code_version` instead"
 )
 def op(
-    compute_fn: Optional[Callable[P, R]] = None,
+    compute_fn = None,
     *,
     name: Optional[str] = None,
     description: Optional[str] = None,
@@ -184,7 +198,7 @@ def op(
     version: Optional[str] = None,
     retry_policy: Optional[RetryPolicy] = None,
     code_version: Optional[str] = None,
-) -> Union["OpDefinition[P, R]", _Op]:
+):
     """Create an op with the specified parameters from the decorated function.
 
     Ins and outs will be inferred from the type signature of the decorated function

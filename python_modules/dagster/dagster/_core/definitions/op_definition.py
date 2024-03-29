@@ -13,6 +13,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    overload,
 )
 
 from typing_extensions import ParamSpec, TypeAlias, get_args, get_origin
@@ -64,6 +65,7 @@ R = TypeVar("R")
 
 OtherP = ParamSpec("OtherP")
 OtherR = TypeVar("OtherR")
+
 
 @deprecated_param(
     param="version", breaking_version="2.0", additional_warn_text="Use `code_version` instead."
@@ -458,7 +460,15 @@ class OpDefinition(NodeDefinition, IHasInternalInit, Generic[P, R]):
     ) -> Sequence[NodeInputHandle]:
         return [input_handle]
 
+    @overload
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
+        ...
+
+    @overload
+    def __call__(self, *args: Any, **kwargs: Any) -> R:
+        ...
+
+    def __call__(self, *args: Any, **kwargs: Any):
         from .composition import is_in_composition
 
         if is_in_composition():
